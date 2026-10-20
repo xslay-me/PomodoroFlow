@@ -1,0 +1,6 @@
+{
+  "name": "PomodoroFlow",
+  "description": "An interactive claymorphism-inspired Pomodoro app with sleep-resilient focus timer, gamified rewards, companion plant, journey statistics, and sound alerts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

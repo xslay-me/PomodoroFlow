@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --clay-bg: #fdfaf8;
+    --clay-surface: #ffffff;
+    --clay-shadow-dark: rgba(180, 150, 140, 0.28);
+    --clay-shadow-light: rgba(255, 255, 255, 0.95);
+    --clay-inset-highlight: rgba(255, 255, 255, 0.8);
+    --clay-inset-shadow: rgba(180, 150, 140, 0.14);
+  }
+
+  .dark {
+    --clay-bg: #0f172a;
+    --clay-surface: #1e293b;
+    --clay-shadow-dark: rgba(0, 0, 0, 0.6);
+    --clay-shadow-light: rgba(51, 65, 85, 0.22);
+    --clay-inset-highlight: rgba(255, 255, 255, 0.08);
+    --clay-inset-shadow: rgba(0, 0, 0, 0.5);
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+/* Claymorphic Utility Classes */
+.clay-card {
+  border-radius: 1.75rem;
+  box-shadow: 
+    14px 14px 30px var(--clay-shadow-dark),
+    -10px -10px 24px var(--clay-shadow-light),
+    inset 3px 3px 6px var(--clay-inset-highlight),
+    inset -3px -3px 6px var(--clay-inset-shadow);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.clay-card-subtle {
+  border-radius: 1.25rem;
+  box-shadow: 
+    8px 8px 18px var(--clay-shadow-dark),
+    -6px -6px 16px var(--clay-shadow-light),
+    inset 2px 2px 4px var(--clay-inset-highlight),
+    inset -2px -2px 4px var(--clay-inset-shadow);
+  transition: all 0.2s ease;
+}
+
+.clay-card-inset {
+  border-radius: 1.25rem;
+  box-shadow: 
+    inset 5px 5px 10px var(--clay-shadow-dark),
+    inset -5px -5px 10px var(--clay-shadow-light);
+}
+
+.clay-button {
+  border-radius: 1.25rem;
+  box-shadow: 
+    8px 8px 16px var(--clay-shadow-dark),
+    -6px -6px 14px var(--clay-shadow-light),
+    inset 2px 2px 4px var(--clay-inset-highlight),
+    inset -2px -2px 4px var(--clay-inset-shadow);
+  transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+  user-select: none;
+}
+
+.clay-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    10px 10px 20px var(--clay-shadow-dark),
+    -8px -8px 18px var(--clay-shadow-light),
+    inset 3px 3px 5px var(--clay-inset-highlight),
+    inset -3px -3px 5px var(--clay-inset-shadow);
+}
+
+.clay-button:active {
+  transform: translateY(2px) scale(0.98);
+  box-shadow: 
+    inset 4px 4px 8px var(--clay-shadow-dark),
+    inset -4px -4px 8px var(--clay-shadow-light);
+}
+
+.clay-button-primary {
+  border-radius: 1.5rem;
+  box-shadow: 
+    10px 10px 22px rgba(244, 63, 94, 0.35),
+    -8px -8px 18px var(--clay-shadow-light),
+    inset 3px 3px 6px rgba(255, 255, 255, 0.6),
+    inset -3px -3px 6px rgba(190, 18, 60, 0.3);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.clay-button-primary:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 
+    12px 12px 26px rgba(244, 63, 94, 0.45),
+    -9px -9px 20px var(--clay-shadow-light),
+    inset 3px 3px 6px rgba(255, 255, 255, 0.7);
+}
+
+.clay-button-primary:active {
+  transform: translateY(2px) scale(0.97);
+  box-shadow: 
+    inset 5px 5px 10px rgba(190, 18, 60, 0.5),
+    inset -4px -4px 8px rgba(255, 255, 255, 0.2);
+}
+
+.clay-circle-gauge {
+  filter: drop-shadow(10px 12px 20px var(--clay-shadow-dark))
+         drop-shadow(-8px -8px 16px var(--clay-shadow-light));
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
+}
