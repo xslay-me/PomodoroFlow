@@ -1,3 +1,4 @@
+import { Modal } from './Modal';
 import React from 'react';
 import { X, Trophy, Sparkles, Flame, Hourglass, Crown, Target, Moon, Sprout, Lock, CheckCircle2 } from 'lucide-react';
 import { ALL_ACHIEVEMENTS } from '../utils/rewardsEngine';
@@ -22,19 +23,17 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 };
 
 export const AchievementsModal: React.FC<AchievementsModalProps> = ({ isOpen, onClose, stats }) => {
-  if (!isOpen) return null;
-
   const unlockedSet = new Set(stats.unlockedBadges || []);
   const unlockedCount = stats.unlockedBadges?.length || 0;
   const totalCount = ALL_ACHIEVEMENTS.length;
   const percentage = Math.round((unlockedCount / totalCount) * 100);
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
       aria-labelledby="achievements-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in"
+      className="fixed inset-0 z-50 open:flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in"
     >
       <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto clay-card bg-white dark:bg-slate-800 p-6 sm:p-8 text-slate-800 dark:text-slate-100 relative shadow-2xl">
         {/* Header */}
@@ -129,6 +128,6 @@ export const AchievementsModal: React.FC<AchievementsModalProps> = ({ isOpen, on
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };

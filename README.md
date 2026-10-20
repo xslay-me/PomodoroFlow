@@ -9,13 +9,14 @@ Built with **React**, **TypeScript**, and **Tailwind CSS**.
 ## ✨ Features
 
 - **Claymorphic Aesthetic UI**: Soft double shadows, rounded pillowy cards, subtle inner highlights, and soothing pastel gradients tailored for focus and relaxation.
+- **Automatic Transitions**: Optionally start breaks and focus sessions automatically from Settings. Reopening an expired timer records it once and starts at most one fresh phase.
 - **Classic Pomodoro Cycles**: Pre-configured with the standard 25-minute focus session, 5-minute short break, and 15-minute long rest after 4 completed rounds.
 - **Sleep & Reload Resilient**: Utilizes real-time delta timestamps so your timer never freezes or resets when your laptop goes into sleep mode, tabs background, or the browser is reloaded.
 - **Stop, Resume & Skip Controls**: Full user control with tactile clay buttons to start, pause, resume, step forward, or add quick 5-minute extensions.
 - **Gamified Clay Companion**: Earn XP and focus seeds with every session. Watch your seedling evolve through 5 growth stages (*Pebble Seedling* ➔ *Clay Sprout* ➔ *Chubby Succulent* ➔ *Pastel Lotus* ➔ *Zen Bonsai Master*). Tap your plant companion for encouraging words!
 - **8 Unlockable Trophies**: Earn milestone badges for streaks, session volume, evening study, and plant care.
 - **Synthesized Web Audio Alerts**: Built-in chime bells (*Zen Bell (528Hz)*, *Clay Marimba*, *Digital Chime*, *Meditation Gong*) generated completely offline with zero external audio assets.
-- **Focus Shield (Do Not Disturb)**: Automatic notification silencing mode while the timer is running to ensure uninterrupted deep work flow.
+- **Focus Reminder**: A visual reminder to silence notifications before focusing. Browser and operating-system notifications remain under your control.
 - **Full-Screen Zen Mode**: Clean, distraction-free overlay for maximum focus immersion.
 - **Full User Statistics Dashboard**: Displays key performance metrics in one comprehensive claymorphic view:
   - **Total Focused Time**: Aggregate deep work hours and minutes.
@@ -25,7 +26,7 @@ Built with **React**, **TypeScript**, and **Tailwind CSS**.
   - **Interactive Category Filtering**: Breakdown by tags (`#Study`, `#Code`, `#Write`, `#Read`, `#Work`) and recent session history log.
   - **One-Click Demo Seeder & Reset**: Test the dashboard charts immediately with realistic sample history.
 - **Dark Mode Support**: Velvety clay night mode palette that can be toggled directly from the header or settings menu.
-- **100% Client-Side Persistence**: All settings, ongoing timer states, and user history are automatically saved to `localStorage`.
+- **100% Client-Side Persistence**: Timer transitions and history are saved together in IndexedDB and synchronized across tabs. Existing localStorage history migrates automatically; settings remain in localStorage. Browser storage must be available to save progress.
 
 ---
 
@@ -89,7 +90,7 @@ npm run build
 │   │   ├── Header.tsx                 # Top brand bar, streak pill, theme & modal triggers
 │   │   ├── TimerDisplay.tsx           # Circular clay SVG gauge, digital clock, round beads
 │   │   ├── PlantCompanion.tsx         # Interactive SVG clay desk plant with speech bubbles
-│   │   ├── FocusShieldBanner.tsx      # DND notification suppression status badge
+│   │   ├── FocusShieldBanner.tsx      # Visual reminder to silence notifications
 │   │   ├── StatsModal.tsx             # 7-day activity chart, streak tracker & tag breakdown
 │   │   ├── AchievementsModal.tsx      # Clay trophy cabinet & milestone unlocks
 │   │   ├── SettingsModal.tsx          # Cycle duration inputs, chime selectors & dark mode
@@ -97,11 +98,13 @@ npm run build
 │   ├── types/
 │   │   └── pomodoro.ts                # TypeScript interfaces and type definitions
 │   ├── utils/
+│   │   ├── appState.ts                # Atomic IndexedDB state and localStorage migration
+│   │   ├── sessionState.ts            # Session crediting and timer state transitions
 │   │   ├── timerUtils.ts              # Sleep resilience calculation & phase transition logic
 │   │   ├── rewardsEngine.ts           # Plant growth stages, XP formula & badge checkers
 │   │   ├── statsCalculator.ts         # Streak calculation, daily history & tag metrics
 │   │   ├── soundEffects.ts            # Offline Web Audio API tone generator
-│   │   └── storage.ts                 # LocalStorage persistence layer
+│   │   └── storage.ts                 # Legacy persistence and settings
 │   ├── App.tsx                        # Main state orchestrator
 │   ├── index.css                      # Tailwind v4 claymorphism design tokens
 │   └── main.tsx                       # React application entry point

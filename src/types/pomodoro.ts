@@ -60,3 +60,5 @@ export interface PlantStageInfo {
   description: string;
   color: string;
 }
+
+export const SESSION_TAGS = ['Study', 'Code', 'Write', 'Read', 'Work'] as const;

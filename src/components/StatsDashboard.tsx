@@ -15,7 +15,7 @@ import {
   X,
   Filter,
 } from 'lucide-react';
-import { UserStats } from '../types/pomodoro';
+import { SESSION_TAGS, UserStats } from '../types/pomodoro';
 import {
   getWeeklyFocusSummary,
   getTodayMetrics,
@@ -473,7 +473,7 @@ export const StatsDashboard: React.FC<StatsDashboardProps> = ({
               >
                 All
               </button>
-              {['Study', 'Code', 'Write', 'Work'].map((tag) => (
+              {SESSION_TAGS.map((tag) => (
                 <button
                   key={tag}
                   type="button"

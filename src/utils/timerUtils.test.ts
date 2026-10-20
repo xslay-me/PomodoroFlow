@@ -5,6 +5,8 @@ import {
   calculateSleepResilientRemaining,
   calculateProgressPercentage,
   getNextPhase,
+  getCompletedRounds,
+  createSessionId,
   getClayThemeForMode,
 } from './timerUtils.ts';
 
@@ -79,4 +81,30 @@ test('getClayThemeForMode returns distinct theme values for light and dark modes
   const darkFocus = getClayThemeForMode('focus', true);
   assert.ok(lightFocus.bgGradient.includes('rose-50'));
   assert.ok(darkFocus.bgGradient.includes('slate-900'));
+});
+
+
+test('remaining time never reaches zero before the actual deadline', () => {
+  assert.equal(calculateSleepResilientRemaining(1000, true, 1, 999), 1);
+  assert.equal(calculateSleepResilientRemaining(1000, true, 1, 1000), 0);
+});
+
+test('completed round count uses the completed focus sessions during breaks', () => {
+  assert.equal(getCompletedRounds('focus', 1, 4), 0);
+  assert.equal(getCompletedRounds('shortBreak', 2, 4), 1);
+  assert.equal(getCompletedRounds('focus', 4, 4), 3);
+  assert.equal(getCompletedRounds('longBreak', 1, 4), 4);
+});
+
+
+test('session IDs remain unique when randomUUID is unavailable on HTTP origins', () => {
+  const original = crypto.randomUUID;
+  try {
+    Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true });
+    const id = createSessionId();
+    assert.match(id, /^[0-9a-f]{32}$/);
+    assert.notEqual(createSessionId(), id);
+  } finally {
+    Object.defineProperty(crypto, 'randomUUID', { value: original, configurable: true });
+  }
 });

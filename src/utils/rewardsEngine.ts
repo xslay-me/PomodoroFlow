@@ -1,4 +1,4 @@
-import { AchievementBadge, PlantStageInfo, UserStats } from '../types/pomodoro';
+import { AchievementBadge, PlantStageInfo, PomodoroMode, UserStats } from '../types/pomodoro';
 
 export const PLANT_STAGES: PlantStageInfo[] = [
   {
@@ -159,7 +159,7 @@ export function getPlantStage(xp: number): {
 /**
  * Checks for newly unlocked achievements given updated stats
  */
-export function checkNewAchievements(stats: UserStats, currentHour: number = new Date().getHours()): string[] {
+export function checkNewAchievements(stats: UserStats, currentHour: number = new Date().getHours(), completedMode?: PomodoroMode): string[] {
   const newlyUnlocked: string[] = [];
   const existingSet = new Set(stats.unlockedBadges || []);
 
@@ -187,7 +187,7 @@ export function checkNewAchievements(stats: UserStats, currentHour: number = new
     newlyUnlocked.push('sessions_10');
   }
 
-  if (!existingSet.has('night_owl') && (currentHour >= 20 || currentHour < 4) && stats.completedSessions >= 1) {
+  if (!existingSet.has('night_owl') && completedMode === 'focus' && (currentHour >= 20 || currentHour < 4) && stats.completedSessions >= 1) {
     newlyUnlocked.push('night_owl');
   }
 

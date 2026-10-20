@@ -57,7 +57,7 @@ test('checkNewAchievements detects newly qualified badges', () => {
   assert.equal(unlocked.includes('night_owl'), false);
 
   // Night owl check at 21:00 (9 PM)
-  const nightUnlocked = checkNewAchievements(baseStats, 21);
+  const nightUnlocked = checkNewAchievements(baseStats, 21, 'focus');
   assert.ok(nightUnlocked.includes('night_owl'));
 
   // Should not re-unlock already possessed badges
@@ -69,3 +69,19 @@ test('checkNewAchievements detects newly qualified badges', () => {
   assert.equal(withExisting.includes('streak_3'), false);
   assert.ok(withExisting.includes('focus_100'));
 });
+
+
+test('night owl requires the newly completed session to be a focus session', () => {
+  const stats = baseForNightOwl();
+  assert.equal(checkNewAchievements(stats, 21, 'shortBreak').includes('night_owl'), false);
+  assert.equal(checkNewAchievements(stats, 21, 'longBreak').includes('night_owl'), false);
+  assert.equal(checkNewAchievements(stats, 21).includes('night_owl'), false);
+  assert.equal(checkNewAchievements(stats, 14, 'focus').includes('night_owl'), false);
+  assert.equal(checkNewAchievements(stats, 21, 'focus').includes('night_owl'), true);
+});
+
+function baseForNightOwl(): UserStats {
+  return { totalFocusMinutes: 25, completedSessions: 1, streakDays: 1, longestStreakDays: 1,
+    lastActiveDate: '2026-10-20', dailyHistory: {}, dailySessionCount: {}, tagMinutes: {},
+    sessionsHistory: [], xp: 25, unlockedBadges: [] };
+}

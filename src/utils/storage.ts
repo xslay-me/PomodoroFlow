@@ -1,5 +1,5 @@
-import { SessionRecord, TimerSettings, UserStats } from '../types/pomodoro';
-import { getLocalDateString } from './statsCalculator';
+import { TimerSettings, UserStats } from '../types/pomodoro';
+import { createSessionId } from './timerUtils';
 
 const SETTINGS_KEY = 'pomodoroflow_settings_v1';
 const STATS_KEY = 'pomodoroflow_stats_v1';
@@ -40,6 +40,7 @@ export const DEFAULT_STATS: UserStats = {
 };
 
 export interface StoredTimerState {
+  sessionId: string;
   mode: 'focus' | 'shortBreak' | 'longBreak';
   remainingSeconds: number;
   totalDurationSeconds: number;
@@ -103,6 +104,7 @@ export function saveStats(stats: UserStats): void {
 
 export function loadTimerState(defaultFocusMinutes: number = 25): StoredTimerState {
   const fallback: StoredTimerState = {
+    sessionId: createSessionId(),
     mode: 'focus',
     remainingSeconds: defaultFocusMinutes * 60,
     totalDurationSeconds: defaultFocusMinutes * 60,
@@ -117,7 +119,10 @@ export function loadTimerState(defaultFocusMinutes: number = 25): StoredTimerSta
     const raw = localStorage.getItem(TIMER_STATE_KEY);
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
-    return { ...fallback, ...parsed };
+    return {
+      ...fallback, ...parsed,
+      sessionId: parsed.sessionId || `legacy-${parsed.mode}-${parsed.targetEndTime}-${parsed.currentRound}`,
+    };
   } catch (e) {
     console.error('Error loading timer state', e);
     return fallback;

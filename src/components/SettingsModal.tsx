@@ -1,3 +1,4 @@
+import { Modal } from './Modal';
 import React from 'react';
 import { X, Sliders, Bell, Moon, Sun, Volume2, ShieldCheck, Check } from 'lucide-react';
 import { SoundType, TimerSettings } from '../types/pomodoro';
@@ -16,8 +17,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   settings,
   onUpdateSettings,
 }) => {
-  if (!isOpen) return null;
-
   const handleSoundTest = () => {
     playClayPopSound(0.2);
     playCompletionSound(settings.soundType, settings.volume);
@@ -31,11 +30,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   ];
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
       aria-labelledby="settings-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in"
+      className="fixed inset-0 z-50 open:flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in"
     >
       <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto clay-card bg-white dark:bg-slate-800 p-6 sm:p-8 text-slate-800 dark:text-slate-100 relative shadow-2xl">
         {/* Header */}
@@ -129,6 +128,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
 
+        <fieldset className="mb-6 space-y-3 text-sm">
+          <legend className="font-bold mb-2">Automatic cycle transitions</legend>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={settings.autoStartBreaks}
+              onChange={(event) => onUpdateSettings({ autoStartBreaks: event.target.checked })} />
+            Start breaks automatically
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={settings.autoStartPomodoros}
+              onChange={(event) => onUpdateSettings({ autoStartPomodoros: event.target.checked })} />
+            Start focus sessions automatically
+          </label>
+        </fieldset>
+
         {/* Section 2: Sound Alerts & Preview */}
         <div className="mb-6 space-y-3">
           <div className="flex items-center justify-between">
@@ -214,6 +227,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <button
               type="button"
               role="switch"
+              aria-label="Dark mode"
               aria-checked={settings.darkMode}
               onClick={() => {
                 playClayPopSound(0.2);
@@ -235,10 +249,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
               <div>
                 <span className="text-xs font-bold block text-slate-800 dark:text-slate-100">
-                  Focus Shield (DND)
+                  Focus Reminder
                 </span>
                 <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Muffle notifications and distractions while timer is active
+                  Show a reminder to silence notifications before focusing
                 </span>
               </div>
             </div>
@@ -246,6 +260,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <button
               type="button"
               role="switch"
+              aria-label="Focus reminder"
               aria-checked={settings.notificationShield}
               onClick={() => {
                 playClayPopSound(0.2);
@@ -271,6 +286,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };

@@ -2,27 +2,15 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import confetti from 'canvas-confetti';
-import { PomodoroMode, SessionRecord, TimerSettings, UserStats } from './types/pomodoro';
-import {
-  loadSettings,
-  saveSettings,
-  loadStats,
-  saveStats,
-  loadTimerState,
-  saveTimerState,
-} from './utils/storage';
-import {
-  calculateSleepResilientRemaining,
-  getNextPhase,
-  getClayThemeForMode,
-} from './utils/timerUtils';
-import { calculateSessionXP, checkNewAchievements } from './utils/rewardsEngine';
-import { getLocalDateString, updateStreak, updateStreakAndLongest } from './utils/statsCalculator';
+import { PomodoroMode, TimerSettings, UserStats } from './types/pomodoro';
+import { loadSettings, saveSettings, StoredTimerState } from './utils/storage';
+import { PersistedAppState, readAppState, updateAppState } from './utils/appState';
+import { completeTimer, createTimer, nextTimer } from './utils/sessionState';
+import { calculateSleepResilientRemaining, createSessionId, getClayThemeForMode } from './utils/timerUtils';
+import { getActiveStreak } from './utils/statsCalculator';
 import { playCompletionSound } from './utils/soundEffects';
-
 import { Header } from './components/Header';
 import { TimerDisplay } from './components/TimerDisplay';
 import { PlantCompanion } from './components/PlantCompanion';
@@ -34,349 +22,172 @@ import { SettingsModal } from './components/SettingsModal';
 import { DistractionFreeOverlay } from './components/DistractionFreeOverlay';
 
 export default function App() {
-  // Load persistent configurations
   const [settings, setSettings] = useState<TimerSettings>(() => loadSettings());
-  const [stats, setStats] = useState<UserStats>(() => loadStats());
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const [saved, setSaved] = useState<PersistedAppState | null>(null);
+  const savedRef = useRef(saved);
+  const [now, setNow] = useState(Date.now);
+  const [storageError, setStorageError] = useState('');
   const [currentView, setCurrentView] = useState<'timer' | 'dashboard'>('timer');
-
-  // Timer operational states
-  const [mode, setMode] = useState<PomodoroMode>('focus');
-  const [remainingSeconds, setRemainingSeconds] = useState<number>(() => settings.focusMinutes * 60);
-  const [totalDurationSeconds, setTotalDurationSeconds] = useState<number>(() => settings.focusMinutes * 60);
-  const [isRunning, setIsRunning] = useState<boolean>(false);
-  const [targetEndTime, setTargetEndTime] = useState<number | null>(null);
-  const [currentRound, setCurrentRound] = useState<number>(1);
-  const [activeTag, setActiveTag] = useState<string>('Study');
-
-  // Modals & Overlays
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDistractionFree, setIsDistractionFree] = useState(false);
+  const completing = useRef(false);
 
-  // Initial load from local storage
-  const isHydrated = useRef(false);
-
-  useEffect(() => {
-    const saved = loadTimerState(settings.focusMinutes);
-    setMode(saved.mode);
-    setCurrentRound(saved.currentRound);
-    setActiveTag(saved.activeTag);
-
-    // If was running prior to reload or sleep, recalculate remaining seconds
-    if (saved.isRunning && saved.targetEndTime) {
-      const realRemaining = calculateSleepResilientRemaining(
-        saved.targetEndTime,
-        true,
-        saved.remainingSeconds
-      );
-      if (realRemaining > 0) {
-        setRemainingSeconds(realRemaining);
-        setTotalDurationSeconds(saved.totalDurationSeconds);
-        setTargetEndTime(saved.targetEndTime);
-        setIsRunning(true);
-      } else {
-        // Timer completed during sleep / while closed
-        setRemainingSeconds(0);
-        setTotalDurationSeconds(saved.totalDurationSeconds);
-        setTargetEndTime(null);
-        setIsRunning(false);
-      }
-    } else {
-      setRemainingSeconds(saved.remainingSeconds);
-      setTotalDurationSeconds(saved.totalDurationSeconds);
-      setTargetEndTime(null);
-      setIsRunning(false);
+  const applySaved = useCallback((next: PersistedAppState) => {
+    if (!savedRef.current || next.revision >= savedRef.current.revision) {
+      savedRef.current = next;
+      setSaved(next);
+      setNow(Date.now());
     }
-    isHydrated.current = true;
+    setStorageError('');
   }, []);
 
-  // Sync dark mode class to root document element
-  useEffect(() => {
-    if (settings.darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+  const reportStorageError = useCallback((error: unknown) => {
+    console.error('Unable to save progress', error);
+    setStorageError('Progress could not be saved. Allow browser storage and try again.');
+  }, []);
+
+  const refresh = useCallback(() => {
+    return readAppState(settingsRef.current.focusMinutes).then(applySaved).catch(reportStorageError);
+  }, [applySaved, reportStorageError]);
+
+  const commit = useCallback(async (update: (current: PersistedAppState) => PersistedAppState) => {
+    try {
+      const next = await updateAppState(update, settingsRef.current.focusMinutes);
+      applySaved(next);
+      return next;
+    } catch (error) {
+      reportStorageError(error);
     }
+  }, [applySaved, reportStorageError]);
+
+  useEffect(() => {
+    void refresh();
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === 'pomodoroflow_settings_v1') setSettings(loadSettings());
+      if (event.key === null || event.key === 'pomodoroflow_timer_state_v1' || event.key === 'pomodoroflow_stats_v1') {
+        void refresh();
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [refresh]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', settings.darkMode);
   }, [settings.darkMode]);
 
-  // Persist timer state whenever key timer attributes change
   useEffect(() => {
-    if (!isHydrated.current) return;
-    saveTimerState({
-      mode,
-      remainingSeconds,
-      totalDurationSeconds,
-      isRunning,
-      targetEndTime,
-      currentRound,
-      activeTag,
-    });
-  }, [mode, remainingSeconds, totalDurationSeconds, isRunning, targetEndTime, currentRound, activeTag]);
-
-  // Handle session completion logic
-  const handleSessionComplete = useCallback(() => {
-    // Play celebratory sound
-    if (settings.soundEnabled) {
-      playCompletionSound(settings.soundType, settings.volume);
-    }
-
-    // Confetti burst for focus session completions
-    if (mode === 'focus') {
-      try {
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.65 },
-          colors: ['#fb7185', '#fda4af', '#facc15', '#34d399', '#38bdf8'],
-        });
-      } catch (e) {
-        // Fallback gracefully if confetti fails
-      }
-    }
-
-    // Calculate progression and stats
-    const todayStr = getLocalDateString();
-    const durationMins = Math.round(totalDurationSeconds / 60);
-    const xpGained = calculateSessionXP(mode, stats.streakDays);
-
-    const newRecord: SessionRecord = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      mode,
-      durationMinutes: durationMins,
-      timestamp: Date.now(),
-      tag: activeTag,
-    };
-
-    setStats((prev) => {
-      const isFocus = mode === 'focus';
-      const streakResult = isFocus
-        ? updateStreakAndLongest(prev.streakDays, prev.longestStreakDays || 0, prev.lastActiveDate, todayStr)
-        : { currentStreak: prev.streakDays, longestStreak: prev.longestStreakDays || prev.streakDays };
-      const updatedTotalMins = isFocus ? prev.totalFocusMinutes + durationMins : prev.totalFocusMinutes;
-      const updatedCompleted = isFocus ? prev.completedSessions + 1 : prev.completedSessions;
-      const updatedXP = prev.xp + xpGained;
-
-      const updatedDailyHistory = { ...prev.dailyHistory };
-      const updatedDailySessionCount = { ...(prev.dailySessionCount || {}) };
-      if (isFocus) {
-        updatedDailyHistory[todayStr] = (updatedDailyHistory[todayStr] || 0) + durationMins;
-        updatedDailySessionCount[todayStr] = (updatedDailySessionCount[todayStr] || 0) + 1;
-      }
-
-      const updatedTagMinutes = { ...prev.tagMinutes };
-      if (isFocus) {
-        updatedTagMinutes[activeTag] = (updatedTagMinutes[activeTag] || 0) + durationMins;
-      }
-
-      const nextStats: UserStats = {
-        ...prev,
-        totalFocusMinutes: updatedTotalMins,
-        completedSessions: updatedCompleted,
-        streakDays: streakResult.currentStreak,
-        longestStreakDays: streakResult.longestStreak,
-        lastActiveDate: isFocus ? todayStr : prev.lastActiveDate,
-        dailyHistory: updatedDailyHistory,
-        dailySessionCount: updatedDailySessionCount,
-        tagMinutes: updatedTagMinutes,
-        sessionsHistory: [...prev.sessionsHistory, newRecord],
-        xp: updatedXP,
-      };
-
-      // Check achievement badges
-      const newBadges = checkNewAchievements(nextStats);
-      if (newBadges.length > 0) {
-        nextStats.unlockedBadges = [...new Set([...nextStats.unlockedBadges, ...newBadges])];
-      }
-
-      saveStats(nextStats);
-      return nextStats;
-    });
-
-    // Advance to next cycle phase
-    const nextPhaseInfo = getNextPhase(mode, currentRound, settings.longBreakInterval);
-    const nextDurationMinutes =
-      nextPhaseInfo.nextMode === 'focus'
-        ? settings.focusMinutes
-        : nextPhaseInfo.nextMode === 'shortBreak'
-        ? settings.shortBreakMinutes
-        : settings.longBreakMinutes;
-
-    const nextDurationSecs = nextDurationMinutes * 60;
-
-    setMode(nextPhaseInfo.nextMode);
-    setCurrentRound(nextPhaseInfo.nextRound);
-    setRemainingSeconds(nextDurationSecs);
-    setTotalDurationSeconds(nextDurationSecs);
-    setTargetEndTime(null);
-    setIsRunning(false);
-  }, [
-    mode,
-    currentRound,
-    settings,
-    stats.streakDays,
-    totalDurationSeconds,
-    activeTag,
-  ]);
-
-  // Main Timer Interval Loop with Sleep Detection
-  useEffect(() => {
-    if (!isRunning || !targetEndTime) return;
-
     const checkTime = () => {
-      const realRemaining = calculateSleepResilientRemaining(targetEndTime, true, remainingSeconds);
-      if (realRemaining <= 0) {
-        setRemainingSeconds(0);
-        setIsRunning(false);
-        setTargetEndTime(null);
-        handleSessionComplete();
-      } else {
-        setRemainingSeconds(realRemaining);
-      }
+      const current = savedRef.current;
+      const timestamp = Date.now();
+      setNow(timestamp);
+      if (!current?.timer.isRunning || current.timer.targetEndTime === null
+        || timestamp < current.timer.targetEndTime || completing.current) return;
+      completing.current = true;
+      const sessionId = current.timer.sessionId;
+      const completedMode = current.timer.mode;
+      let credited = false;
+      void commit((latest) => {
+        const next = completeTimer(latest, sessionId, settingsRef.current, timestamp);
+        credited = next !== latest && next.stats !== latest.stats;
+        return next;
+      }).then((result) => {
+        // Only the tab that credited the session celebrates; saving is independent of audio.
+        if (result && credited) {
+          try {
+            if (settingsRef.current.soundEnabled) {
+              playCompletionSound(settingsRef.current.soundType, settingsRef.current.volume);
+            }
+            if (completedMode === 'focus') {
+              confetti({ particleCount: 80, spread: 70, origin: { y: 0.65 },
+                colors: ['#fb7185', '#fda4af', '#facc15', '#34d399', '#38bdf8'] });
+            }
+          } catch (error) {
+            console.error('Completion effect unavailable', error);
+          }
+        }
+      }).finally(() => { completing.current = false; });
     };
-
-    // Run check immediately on mount or wake
+    const onWake = () => { checkTime(); void refresh(); };
+    const onVisibility = () => { if (!document.hidden) onWake(); };
     checkTime();
-
-    const intervalId = window.setInterval(checkTime, 500);
-
-    // Resynchronize on tab focus or sleep wake
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        checkTime();
-      }
-    };
-
-    window.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', checkTime);
-
+    const interval = window.setInterval(checkTime, 500);
+    window.addEventListener('focus', onWake);
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
-      clearInterval(intervalId);
-      window.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', checkTime);
+      window.clearInterval(interval);
+      window.removeEventListener('focus', onWake);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [isRunning, targetEndTime, remainingSeconds, handleSessionComplete]);
+  }, [commit, refresh, saved !== null]);
 
-  // Timer Control Actions
-  const handleStart = () => {
-    const end = Date.now() + remainingSeconds * 1000;
-    setTargetEndTime(end);
-    setIsRunning(true);
+  const updateTimer = (update: (timer: StoredTimerState) => StoredTimerState) => {
+    void commit((current) => ({ ...current, timer: update(current.timer) }));
   };
-
+  const handleStart = () => updateTimer((timer) => timer.isRunning ? timer : {
+    ...timer, isRunning: true, targetEndTime: Date.now() + timer.remainingSeconds * 1000,
+  });
   const handlePause = () => {
-    // When stopped / paused, freeze remaining seconds and clear target end time
-    if (targetEndTime) {
-      const realRemaining = calculateSleepResilientRemaining(targetEndTime, true, remainingSeconds);
-      setRemainingSeconds(realRemaining);
-    }
-    setTargetEndTime(null);
-    setIsRunning(false);
-  };
-
-  const handleReset = () => {
-    setIsRunning(false);
-    setTargetEndTime(null);
-    setRemainingSeconds(totalDurationSeconds);
-  };
-
-  const handleSkip = () => {
-    setIsRunning(false);
-    setTargetEndTime(null);
-    const nextPhaseInfo = getNextPhase(mode, currentRound, settings.longBreakInterval);
-    const nextDurationMinutes =
-      nextPhaseInfo.nextMode === 'focus'
-        ? settings.focusMinutes
-        : nextPhaseInfo.nextMode === 'shortBreak'
-        ? settings.shortBreakMinutes
-        : settings.longBreakMinutes;
-
-    const nextDurationSecs = nextDurationMinutes * 60;
-    setMode(nextPhaseInfo.nextMode);
-    setCurrentRound(nextPhaseInfo.nextRound);
-    setRemainingSeconds(nextDurationSecs);
-    setTotalDurationSeconds(nextDurationSecs);
-  };
-
-  const handleAddFiveMinutes = () => {
-    const additionalSecs = 5 * 60;
-    setRemainingSeconds((prev) => {
-      const nextRemaining = prev + additionalSecs;
-      if (isRunning && targetEndTime) {
-        setTargetEndTime(targetEndTime + additionalSecs * 1000);
-      }
-      return nextRemaining;
+    void commit((current) => {
+      const next = completeTimer(current, current.timer.sessionId, settingsRef.current);
+      const timer = next.timer;
+      return { ...next, timer: { ...timer, isRunning: false, targetEndTime: null,
+        remainingSeconds: calculateSleepResilientRemaining(timer.targetEndTime, timer.isRunning, timer.remainingSeconds) } };
     });
-    setTotalDurationSeconds((prev) => prev + additionalSecs);
   };
-
-  const handleSelectMode = (newMode: PomodoroMode) => {
-    setIsRunning(false);
-    setTargetEndTime(null);
-    setMode(newMode);
-    const durationMinutes =
-      newMode === 'focus'
-        ? settings.focusMinutes
-        : newMode === 'shortBreak'
-        ? settings.shortBreakMinutes
-        : settings.longBreakMinutes;
-    const durSecs = durationMinutes * 60;
-    setRemainingSeconds(durSecs);
-    setTotalDurationSeconds(durSecs);
-  };
-
-  const handleUpdateSettings = (newPartial: Partial<TimerSettings>) => {
-    const updated = { ...settings, ...newPartial };
+  const handleReset = () => updateTimer((timer) => ({
+    ...timer, sessionId: createSessionId(), remainingSeconds: timer.totalDurationSeconds,
+    isRunning: false, targetEndTime: null,
+  }));
+  const handleSkip = () => updateTimer((timer) => nextTimer(timer, settingsRef.current));
+  const handleAddFiveMinutes = () => updateTimer((timer) => ({
+    ...timer,
+    remainingSeconds: calculateSleepResilientRemaining(timer.targetEndTime, timer.isRunning, timer.remainingSeconds) + 300,
+    totalDurationSeconds: timer.totalDurationSeconds + 300,
+    targetEndTime: timer.isRunning && timer.targetEndTime !== null ? timer.targetEndTime + 300000 : null,
+  }));
+  const handleSelectMode = (mode: PomodoroMode) => updateTimer((timer) =>
+    createTimer(mode, timer.currentRound, timer.activeTag, settingsRef.current));
+  const handleUpdateSettings = (partial: Partial<TimerSettings>) => {
+    const updated = { ...settingsRef.current, ...partial };
+    settingsRef.current = updated;
     setSettings(updated);
     saveSettings(updated);
-
-    // If timer is not running, adjust total duration if current mode duration was updated
-    if (!isRunning) {
-      if (mode === 'focus' && newPartial.focusMinutes !== undefined) {
-        const dur = newPartial.focusMinutes * 60;
-        setRemainingSeconds(dur);
-        setTotalDurationSeconds(dur);
-      } else if (mode === 'shortBreak' && newPartial.shortBreakMinutes !== undefined) {
-        const dur = newPartial.shortBreakMinutes * 60;
-        setRemainingSeconds(dur);
-        setTotalDurationSeconds(dur);
-      } else if (mode === 'longBreak' && newPartial.longBreakMinutes !== undefined) {
-        const dur = newPartial.longBreakMinutes * 60;
-        setRemainingSeconds(dur);
-        setTotalDurationSeconds(dur);
-      }
-    }
+    const durationChanged = partial.focusMinutes !== undefined || partial.shortBreakMinutes !== undefined || partial.longBreakMinutes !== undefined;
+    if (durationChanged) updateTimer((timer) => {
+      const changed = timer.mode === 'focus' ? partial.focusMinutes
+        : timer.mode === 'shortBreak' ? partial.shortBreakMinutes : partial.longBreakMinutes;
+      return !timer.isRunning && changed !== undefined
+        ? createTimer(timer.mode, timer.currentRound, timer.activeTag, updated) : timer;
+    });
   };
+  const handleUpdateStats = (stats: UserStats) => { void commit((current) => ({ ...current, stats })); };
 
-  const handleResetStats = () => {
-    const freshStats: UserStats = {
-      totalFocusMinutes: 0,
-      completedSessions: 0,
-      streakDays: 0,
-      longestStreakDays: 0,
-      lastActiveDate: '',
-      dailyHistory: {},
-      dailySessionCount: {},
-      tagMinutes: { Study: 0, Code: 0, Write: 0, Read: 0, Work: 0 },
-      sessionsHistory: [],
-      xp: 0,
-      unlockedBadges: [],
-    };
-    setStats(freshStats);
-    saveStats(freshStats);
-  };
+  if (!saved) return <main className="p-8 text-center">
+    <p role={storageError ? 'alert' : 'status'}>{storageError || 'Loading saved progress…'}</p>
+    {storageError && <button type="button" onClick={() => void refresh()}>Try again</button>}
+  </main>;
 
+  const { stats, timer } = saved;
+  const { mode, totalDurationSeconds, isRunning, currentRound, activeTag } = timer;
+  const remainingSeconds = calculateSleepResilientRemaining(timer.targetEndTime, isRunning, timer.remainingSeconds, now);
+  const displayStats = { ...stats, streakDays: getActiveStreak(stats, now) };
   const clayTheme = getClayThemeForMode(mode, settings.darkMode);
 
   return (
     <div
       className={`min-h-screen bg-gradient-to-b ${clayTheme.bgGradient} transition-colors duration-500 pb-12 flex flex-col`}
     >
+      {storageError && <p role="alert" className="p-4 text-center text-rose-700 dark:text-rose-300">{storageError}</p>}
       {/* Top Header */}
       <Header
         mode={mode}
         settings={settings}
-        stats={stats}
+        stats={displayStats}
         isRunning={isRunning}
         currentView={currentView}
         onSelectView={setCurrentView}
@@ -388,7 +199,7 @@ export default function App() {
         onToggleSound={() => handleUpdateSettings({ soundEnabled: !settings.soundEnabled })}
       />
 
-      {/* Focus Shield / DND Banner */}
+      {/* Focus Reminder Banner */}
       {settings.notificationShield && currentView === 'timer' && (
         <FocusShieldBanner isRunning={isRunning} mode={mode} />
       )}
@@ -397,11 +208,8 @@ export default function App() {
       {currentView === 'dashboard' ? (
         <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-2 animate-in fade-in duration-300">
           <StatsDashboard
-            stats={stats}
-            onUpdateStats={(newStats) => {
-              setStats(newStats);
-              saveStats(newStats);
-            }}
+            stats={displayStats}
+            onUpdateStats={handleUpdateStats}
             onClose={() => setCurrentView('timer')}
             isFullView={true}
           />
@@ -419,13 +227,14 @@ export default function App() {
               totalRounds={settings.longBreakInterval}
               activeTag={activeTag}
               isDark={settings.darkMode}
+              settings={settings}
               onStart={handleStart}
               onPause={handlePause}
               onReset={handleReset}
               onSkip={handleSkip}
               onAddFiveMinutes={handleAddFiveMinutes}
               onSelectMode={handleSelectMode}
-              onSelectTag={setActiveTag}
+              onSelectTag={(activeTag) => updateTimer((timer) => ({ ...timer, activeTag }))}
             />
           </div>
 
@@ -462,17 +271,14 @@ export default function App() {
       <StatsModal
         isOpen={isStatsOpen}
         onClose={() => setIsStatsOpen(false)}
-        stats={stats}
-        onUpdateStats={(newStats) => {
-          setStats(newStats);
-          saveStats(newStats);
-        }}
+        stats={displayStats}
+        onUpdateStats={handleUpdateStats}
       />
 
       <AchievementsModal
         isOpen={isAchievementsOpen}
         onClose={() => setIsAchievementsOpen(false)}
-        stats={stats}
+        stats={displayStats}
       />
 
       <SettingsModal

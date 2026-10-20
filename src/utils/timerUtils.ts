@@ -24,7 +24,7 @@ export function calculateSleepResilientRemaining(
     return Math.max(0, storedRemaining);
   }
   const diffMs = targetEndTime - nowMs;
-  return Math.max(0, Math.round(diffMs / 1000));
+  return Math.max(0, Math.ceil(diffMs / 1000));
 }
 
 /**
@@ -144,4 +144,15 @@ export function getClayThemeForMode(mode: PomodoroMode, isDark: boolean) {
         badgeText: 'Long Rest',
       };
   }
+}
+
+/** Focus rounds completed within the displayed cycle. */
+export function getCompletedRounds(mode: PomodoroMode, currentRound: number, totalRounds: number): number {
+  return mode === 'longBreak' ? totalRounds : Math.max(0, Math.min(totalRounds, currentRound - 1));
+}
+
+/** Random IDs also work when the dev server is opened over HTTP on a LAN. */
+export function createSessionId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }

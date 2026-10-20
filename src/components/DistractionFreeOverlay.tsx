@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import { Modal } from './Modal';
+import React from 'react';
 import { Minimize2, Play, Pause, RotateCcw } from 'lucide-react';
 import { PomodoroMode } from '../types/pomodoro';
 import { formatTime, calculateProgressPercentage, getClayThemeForMode } from '../utils/timerUtils';
@@ -31,26 +32,15 @@ export const DistractionFreeOverlay: React.FC<DistractionFreeOverlayProps> = ({
   onPause,
   onReset,
 }) => {
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
   const theme = getClayThemeForMode(mode, isDark);
   const progressPercent = calculateProgressPercentage(remainingSeconds, totalDurationSeconds);
 
   return (
-    <div
-      role="dialog"
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
       aria-label="Distraction-Free Zen Timer Mode"
-      className="fixed inset-0 z-50 flex flex-col items-center justify-between p-6 sm:p-10 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors animate-in fade-in"
+      className="fixed inset-0 z-50 open:flex flex-col items-center justify-between p-6 sm:p-10 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors animate-in fade-in"
     >
       {/* Top Bar */}
       <div className="w-full max-w-3xl flex items-center justify-between">
@@ -143,6 +133,6 @@ export const DistractionFreeOverlay: React.FC<DistractionFreeOverlayProps> = ({
       <p className="text-xs text-slate-400">
         Press <kbd className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 font-mono">Esc</kbd> to return to standard view
       </p>
-    </div>
+    </Modal>
   );
 };

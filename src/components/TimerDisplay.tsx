@@ -1,8 +1,8 @@
 import React from 'react';
 import { Play, Pause, RotateCcw, SkipForward, Plus } from 'lucide-react';
 import { motion } from 'motion/react';
-import { PomodoroMode } from '../types/pomodoro';
-import { formatTime, calculateProgressPercentage, getClayThemeForMode } from '../utils/timerUtils';
+import { PomodoroMode, SESSION_TAGS, TimerSettings } from '../types/pomodoro';
+import { formatTime, calculateProgressPercentage, getClayThemeForMode, getCompletedRounds } from '../utils/timerUtils';
 import { playClayPopSound } from '../utils/soundEffects';
 
 interface TimerDisplayProps {
@@ -14,6 +14,7 @@ interface TimerDisplayProps {
   totalRounds: number;
   activeTag: string;
   isDark: boolean;
+  settings: TimerSettings;
   onStart: () => void;
   onPause: () => void;
   onReset: () => void;
@@ -22,8 +23,6 @@ interface TimerDisplayProps {
   onSelectMode: (mode: PomodoroMode) => void;
   onSelectTag: (tag: string) => void;
 }
-
-const TAGS = ['Study', 'Code', 'Write', 'Read', 'Work'];
 
 export const TimerDisplay: React.FC<TimerDisplayProps> = ({
   mode,
@@ -34,6 +33,7 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({
   totalRounds,
   activeTag,
   isDark,
+  settings,
   onStart,
   onPause,
   onReset,
@@ -43,6 +43,7 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({
   onSelectTag,
 }) => {
   const theme = getClayThemeForMode(mode, isDark);
+  const completedRounds = getCompletedRounds(mode, currentRound, totalRounds);
   const progressPercent = calculateProgressPercentage(remainingSeconds, totalDurationSeconds);
 
   // SVG circular gauge math
@@ -77,7 +78,7 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({
           }`}
           aria-pressed={mode === 'focus'}
         >
-          Focus (25m)
+          Focus ({settings.focusMinutes}m)
         </button>
         <button
           type="button"
@@ -89,7 +90,7 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({
           }`}
           aria-pressed={mode === 'shortBreak'}
         >
-          Short Break (5m)
+          Short Break ({settings.shortBreakMinutes}m)
         </button>
         <button
           type="button"
@@ -101,7 +102,7 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({
           }`}
           aria-pressed={mode === 'longBreak'}
         >
-          Long Rest (15m)
+          Long Rest ({settings.longBreakMinutes}m)
         </button>
       </nav>
 
@@ -177,9 +178,9 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({
             </div>
 
             {/* 4-Cycle Bead Indicators */}
-            <div className="flex items-center gap-2 mt-3" aria-label={`Cycle progress: ${currentRound} of ${totalRounds} completed`}>
+            <div className="flex items-center gap-2 mt-3" aria-label={`Cycle progress: ${completedRounds} of ${totalRounds} completed`}>
               {Array.from({ length: totalRounds }).map((_, idx) => {
-                const isCompleted = idx + 1 < currentRound || (mode !== 'focus' && idx + 1 <= currentRound);
+                const isCompleted = idx < completedRounds;
                 const isCurrent = idx + 1 === currentRound && mode === 'focus';
                 return (
                   <div
@@ -201,7 +202,7 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({
 
         {/* Task Tag Quick Selector Bar */}
         <div className="w-full flex items-center justify-center gap-1.5 flex-wrap my-4">
-          {TAGS.map((tag) => (
+          {SESSION_TAGS.map((tag) => (
             <button
               key={tag}
               type="button"

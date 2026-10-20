@@ -21,6 +21,13 @@ export function getDaysDifference(dateStr1: string, dateStr2: string): number {
   return Math.round(diffTime / (1000 * 60 * 60 * 24));
 }
 
+/** Returns the streak that is still active today (or at a completion timestamp). */
+export function getActiveStreak(stats: UserStats, timestamp = Date.now()): number {
+  const today = getLocalDateString(timestamp);
+  if (!stats.lastActiveDate || stats.lastActiveDate > today) return 0;
+  return getDaysDifference(stats.lastActiveDate, today) <= 1 ? stats.streakDays : 0;
+}
+
 /**
  * Calculates updated streak count given previous streak, last active date, and current date
  */
